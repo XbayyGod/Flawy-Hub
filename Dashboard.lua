@@ -96,8 +96,8 @@ function Dashboard:Load(Parent, Palette)
         end)
     end
 
-    CreateLinkBtn("JOIN DISCORD", Color3.fromRGB(88, 101, 242), "https://discord.gg/link_lu")
-    CreateLinkBtn("YOUTUBE CHANNEL", Color3.fromRGB(255, 0, 0), "https://youtube.com/link_lu")
+    CreateSocialBtn("DISCORD", Color3.fromRGB(75, 85, 200), "https://discord.gg/link_lu")
+    CreateSocialBtn("TIKTOK", Color3.fromRGB(210, 50, 100), "https://tiktok.com/@link_lu")
 
     -- [[ 3. SYSTEM LOGS / NEWS CARD ]]
     local NewsCard = CreateCard("News", 3, 110)
