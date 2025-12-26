@@ -1,14 +1,14 @@
 local Dashboard = {}
+
 function Dashboard:Load(Parent, Palette)
     local Layout = Instance.new("UIListLayout", Parent)
-    Layout.SortOrder = Enum.SortOrder.LayoutOrder -- Biar urutan rapi dari atas ke bawah
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder -- WAJIB: Biar ngikutin nomor LayoutOrder
     Layout.Padding = UDim.new(0, 12)
-    Instance.new("UIPadding", Parent).PaddingTop = UDim.new(0, 25)
-    Instance.new("UIPadding", Parent).PaddingLeft = UDim.new(0, 25)
-
+    
+    -- Judul (Paling Atas)
     local Title = Instance.new("TextLabel", Parent)
     Title.LayoutOrder = 1
-    Title.Size = UDim2.new(1, -50, 0, 30) -- FULL WIDTH
+    Title.Size = UDim2.new(1, -50, 0, 30)
     Title.Text = "WELCOME, MUHAMAD IQBAL"
     Title.TextColor3 = Palette.TextMain
     Title.Font = Enum.Font.GothamBold
@@ -16,6 +16,7 @@ function Dashboard:Load(Parent, Palette)
     Title.BackgroundTransparency = 1
     Title.TextXAlignment = Enum.TextXAlignment.Left
 
+    -- Info (Bawah Judul)
     local Info = Instance.new("TextLabel", Parent)
     Info.LayoutOrder = 2
     Info.Size = UDim2.new(1, -50, 0, 20)
@@ -26,10 +27,12 @@ function Dashboard:Load(Parent, Palette)
     Info.BackgroundTransparency = 1
     Info.TextXAlignment = Enum.TextXAlignment.Left
 
+    -- Garis Decor (Bawah Info)
     local Line = Instance.new("Frame", Parent)
     Line.LayoutOrder = 3
-    Line.Size = UDim2.new(0.9, 0, 0, 1) -- Garis hampir full
+    Line.Size = UDim2.new(0.9, 0, 0, 1)
     Line.BackgroundColor3 = Palette.Border
     Line.BorderSizePixel = 0
 end
+
 return Dashboard

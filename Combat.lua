@@ -2,11 +2,12 @@ local Combat = {}
 
 function Combat:Load(Parent, Palette)
     local Layout = Instance.new("UIListLayout", Parent)
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder -- WAJIB
     Layout.Padding = UDim.new(0, 10)
-    Instance.new("UIPadding", Parent).PaddingTop = UDim.new(0, 20)
-    Instance.new("UIPadding", Parent).PaddingLeft = UDim.new(0, 20)
 
+    -- Judul Modul (LayoutOrder 1)
     local Title = Instance.new("TextLabel", Parent)
+    Title.LayoutOrder = 1
     Title.Size = UDim2.new(1, -40, 0, 30)
     Title.BackgroundTransparency = 1
     Title.Text = "COMBAT MODULE"
@@ -17,6 +18,7 @@ function Combat:Load(Parent, Palette)
 
     local function CreateToggle(txt)
         local btn = Instance.new("TextButton", Parent)
+        btn.LayoutOrder = 2 -- Di bawah Judul
         btn.Size = UDim2.new(1, -50, 0, 40)
         btn.BackgroundColor3 = Palette.Sidebar
         btn.Text = "[ OFF ] " .. txt

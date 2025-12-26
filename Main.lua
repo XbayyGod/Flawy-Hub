@@ -176,17 +176,18 @@ Instance.new("UICorner", TBtn).CornerRadius = UDim.new(1, 0)
 makeDraggable(Header, Main, false)
 makeDraggable(TBtn, Toggle, true)
 
--- [[ TAB SYSTEM ]]
-local function AddTab(name)
+    -- [[ BAGIAN TAB SYSTEM YANG DI-FIX ]]
+    local function AddTab(name, order) -- Tambahin 'order' di parameter
     local TabPage = Instance.new("CanvasGroup", Container)
     TabPage.Name = name .. "_Page"
-    TabPage.Size = UDim2.new(1, 0, 1, 0) -- Full ke Container
+    TabPage.Size = UDim2.new(1, 0, 1, 0)
     TabPage.BackgroundTransparency = 1
     TabPage.Visible = false
     TabPage.GroupTransparency = 1
 
     local btn = Instance.new("TextButton", Sidebar)
     btn.Name = name .. "_Tab"
+    btn.LayoutOrder = order or 10 -- Menggunakan urutan yang kita input
     btn.Size = UDim2.new(1, 0, 0, 36)
     btn.BackgroundTransparency = 1
     btn.Text = name
@@ -197,6 +198,9 @@ local function AddTab(name)
     btn.AutoButtonColor = false
     btn.SelectionImageObject = NoSelection 
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    -- Pastiin Sidebar urut berdasarkan nomor
+    Sidebar:FindFirstChildOfClass("UIListLayout").SortOrder = Enum.SortOrder.LayoutOrder
 
     local function CreateIndicator(pos, nameTag)
         local ind = Instance.new("Frame", btn)
@@ -214,7 +218,6 @@ local function AddTab(name)
     local IndicatorL = CreateIndicator(UDim2.new(0, -10, 0.5, 0), "IndicatorL")
     local IndicatorR = CreateIndicator(UDim2.new(1, 10, 0.5, 0), "IndicatorR")
 
-    -- [[ BAGIAN TAB SYSTEM DI MAIN.LUA ]]
     local function Switch()
         for _, otherTab in pairs(Sidebar:GetChildren()) do
             if otherTab:IsA("TextButton") then
@@ -226,7 +229,7 @@ local function AddTab(name)
             end
         end
 
-        -- FIX GHOSTING: Matikan halaman lama secara instan
+        -- FIX GHOSTING: Langsung matikan yang lama
         for _, otherPage in pairs(Container:GetChildren()) do
             if otherPage:IsA("CanvasGroup") then
                 otherPage.Visible = false 
@@ -234,7 +237,6 @@ local function AddTab(name)
             end
         end
 
-        -- Aktifkan yang baru
         TweenService:Create(btn, TweenInfo.new(0.3), {TextColor3 = Canvas.TextMain, BackgroundTransparency = 0.95}):Play()
         IndicatorL.Visible = true; IndicatorR.Visible = true
         TweenService:Create(IndicatorL, TweenInfo.new(0.3), {Size = UDim2.new(0, 3, 0, 18)}):Play()
@@ -249,11 +251,11 @@ local function AddTab(name)
 end
 
 -- [[ URUTAN TAB TETAP ]]
-local DashPage = AddTab("DASHBOARD")
-local AutoPage = AddTab("AUTOMATION")
-local CombatPage = AddTab("COMBAT")
-local VisualPage = AddTab("VISUALS")
-local SettingPage = AddTab("SETTINGS")
+local DashPage = AddTab("DASHBOARD", 1)
+local AutoPage = AddTab("AUTOMATION", 2)
+local CombatPage = AddTab("COMBAT", 3)
+local VisualPage = AddTab("VISUALS", 4)
+local SettingPage = AddTab("SETTINGS", 5)
 
 -- [[ LOAD EXTERNAL CONTENT ]]
 local DashScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Dashboard.lua")
