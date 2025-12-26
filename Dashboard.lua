@@ -2,8 +2,9 @@ local Dashboard = {}
 
 function Dashboard:Load(Parent, Palette)
     local TweenService = game:GetService("TweenService")
+    local RunService = game:GetService("RunService")
+    local Players = game:GetService("Players")
     
-    -- [[ LAYOUT UTAMA ]]
     local Layout = Instance.new("UIListLayout", Parent)
     Layout.SortOrder = Enum.SortOrder.LayoutOrder
     Layout.Padding = UDim.new(0, 15)
@@ -13,7 +14,7 @@ function Dashboard:Load(Parent, Palette)
     MainPad.PaddingLeft = UDim.new(0, 20)
     MainPad.PaddingRight = UDim.new(0, 20)
 
-    -- [[ HELPER: CREATE MODERN CARD ]]
+    -- [[ HELPER: CREATE PREMIUM CARD ]]
     local function CreateCard(name, order, height)
         local card = Instance.new("Frame", Parent)
         card.Name = name .. "_Card"
@@ -21,7 +22,6 @@ function Dashboard:Load(Parent, Palette)
         card.Size = UDim2.new(1, 0, 0, height or 100)
         card.BackgroundColor3 = Palette.Sidebar
         card.BorderSizePixel = 0
-        card.ZIndex = 5 -- Pastiin card ada di layer tengah
         
         Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
         local stroke = Instance.new("UIStroke", card)
@@ -31,116 +31,102 @@ function Dashboard:Load(Parent, Palette)
         return card
     end
 
-    -- [[ 1. HEADER CARD (Status Script) ]]
-    local HeaderCard = CreateCard("Header", 1, 80)
-    local HeaderPad = Instance.new("UIPadding", HeaderCard)
-    HeaderPad.PaddingLeft = UDim.new(0, 20)
+    -- [[ 1. SESSION STATISTICS CARD ]]
+    local SessionCard = CreateCard("Session", 1, 95)
+    local SessionPad = Instance.new("UIPadding", SessionCard)
+    SessionPad.PaddingLeft = UDim.new(0, 20)
 
-    local Title = Instance.new("TextLabel", HeaderCard)
-    Title.Size = UDim2.new(1, 0, 0, 40)
-    Title.Position = UDim2.new(0, 0, 0, 10)
-    Title.BackgroundTransparency = 1
-    Title.Text = "FORGE ENGINE <font color='#00C8FF'>STABLE</font>"
-    Title.RichText = true
-    Title.TextColor3 = Palette.TextMain
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 20
-    Title.TextXAlignment = Enum.TextXAlignment.Left
+    local Greet = Instance.new("TextLabel", SessionCard)
+    Greet.Size = UDim2.new(1, 0, 0, 40)
+    Greet.Position = UDim2.new(0, 0, 0, 15)
+    Greet.BackgroundTransparency = 1
+    Greet.Text = "FLAWY HUB <font color='#00C8FF'>v1.1</font> | AUTHENTICATED"
+    Greet.RichText = true
+    Greet.TextColor3 = Palette.TextMain
+    Greet.Font = Enum.Font.GothamBold
+    Greet.TextSize = 18
+    Greet.TextXAlignment = Enum.TextXAlignment.Left
 
-    local Desc = Instance.new("TextLabel", HeaderCard)
-    Desc.Size = UDim2.new(1, 0, 0, 20)
-    Desc.Position = UDim2.new(0, 0, 0, 40)
-    Desc.BackgroundTransparency = 1
-    Desc.Text = "System authenticated. All modules ready to use."
-    Desc.TextColor3 = Palette.TextMuted
-    Desc.Font = Enum.Font.GothamMedium
-    Desc.TextSize = 13
-    Desc.TextXAlignment = Enum.TextXAlignment.Left
+    local UptimeLabel = Instance.new("TextLabel", SessionCard)
+    UptimeLabel.Size = UDim2.new(1, 0, 0, 20)
+    UptimeLabel.Position = UDim2.new(0, 0, 0, 45)
+    UptimeLabel.BackgroundTransparency = 1
+    UptimeLabel.Text = "Uptime: 00:00:00 | Ping: ... ms"
+    UptimeLabel.TextColor3 = Palette.TextMuted
+    UptimeLabel.Font = Enum.Font.GothamMedium
+    UptimeLabel.TextSize = 13
+    UptimeLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- [[ 2. SOCIAL LINKS (Gaya Modern Buttons) ]]
-    local SocialCard = CreateCard("Socials", 2, 100)
+    -- Logic Uptime & Ping
+    local startTime = os.time()
+    task.spawn(function()
+        while task.wait(1) do
+            local seconds = os.time() - startTime
+            local minutes = math.floor(seconds / 60)
+            local hours = math.floor(minutes / 60)
+            local ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 2000)
+            UptimeLabel.Text = string.format("Time: %s | Ping: %d ms", currentTime, ping)
+        end
+    end)
+
+    -- [[ 2. QUICK LINKS CARD ]]
+    local SocialCard = CreateCard("Socials", 2, 75)
     local SocialLayout = Instance.new("UIListLayout", SocialCard)
     SocialLayout.FillDirection = Enum.FillDirection.Horizontal
-    SocialLayout.Padding = UDim.new(0, 10)
+    SocialLayout.Padding = UDim.new(0, 20)
     SocialLayout.VerticalAlignment = Enum.VerticalAlignment.Center
     SocialLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-    local function CreateSocialBtn(name, color, link)
+    local function CreateLinkBtn(name, color, link)
         local btn = Instance.new("TextButton", SocialCard)
-        btn.Name = name .. "Btn"
-        btn.Size = UDim2.new(0, 120, 0, 45)
+        btn.Size = UDim2.new(0, 140, 0, 32)
         btn.BackgroundColor3 = Palette.Header
         btn.Text = name
         btn.TextColor3 = Palette.TextMain
         btn.Font = Enum.Font.GothamBold
-        btn.TextSize = 12
+        btn.TextSize = 11
         btn.AutoButtonColor = false
-        btn.ZIndex = 10 -- FORCE ATAS BIAR BISA DIKLIK
-        btn.Active = true -- Biar nerima input
         
-        local corner = Instance.new("UICorner", btn)
-        corner.CornerRadius = UDim.new(0, 6)
-        
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
         local bStroke = Instance.new("UIStroke", btn)
         bStroke.Color = color
-        bStroke.Thickness = 1.5
-        bStroke.Transparency = 0.4
+        bStroke.Thickness = 1.2
 
-        -- CLICK LOGIC
         btn.MouseButton1Click:Connect(function()
-            if setclipboard then 
-                setclipboard(link)
-                print(name .. " link copied to clipboard!")
-            else
-                print(name .. ": " .. link)
-            end
-            
-            -- Feedback pas diklik
-            btn.BackgroundColor3 = color
-            task.wait(0.1)
-            btn.BackgroundColor3 = Palette.Header
-        end)
-
-        -- HOVER EFFECT
-        btn.MouseEnter:Connect(function()
-            TweenService:Create(bStroke, TweenInfo.new(0.2), {Transparency = 0, Thickness = 2.5}):Play()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Palette.Border}):Play()
-        end)
-        btn.MouseLeave:Connect(function()
-            TweenService:Create(bStroke, TweenInfo.new(0.2), {Transparency = 0.4, Thickness = 1.5}):Play()
-            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Palette.Header}):Play()
+            if setclipboard then setclipboard(link) end
+            print("Link Copied!")
         end)
     end
 
-    CreateSocialBtn("DISCORD", Color3.fromRGB(88, 101, 242), "https://discord.gg/linklu")
-    CreateSocialBtn("TIKTOK", Color3.fromRGB(255, 0, 80), "https://tiktok.com/@linklu")
-    CreateSocialBtn("YOUTUBE", Color3.fromRGB(255, 0, 0), "https://youtube.com/linklu")
+    CreateLinkBtn("JOIN DISCORD", Color3.fromRGB(88, 101, 242), "https://discord.gg/link_lu")
+    CreateLinkBtn("YOUTUBE CHANNEL", Color3.fromRGB(255, 0, 0), "https://youtube.com/link_lu")
 
-    -- [[ 3. NEWS SECTION ]]
-    local NewsCard = CreateCard("News", 3, 100)
+    -- [[ 3. SYSTEM LOGS / NEWS CARD ]]
+    local NewsCard = CreateCard("News", 3, 110)
     local NewsPad = Instance.new("UIPadding", NewsCard)
     NewsPad.PaddingLeft = UDim.new(0, 20)
     NewsPad.PaddingTop = UDim.new(0, 15)
 
     local NewsTitle = Instance.new("TextLabel", NewsCard)
-    NewsTitle.Text = "LATEST UPDATES"
+    NewsTitle.Size = UDim2.new(1, 0, 0, 20)
+    NewsTitle.BackgroundTransparency = 1
+    NewsTitle.Text = "UPDATE LOGS & STATUS"
     NewsTitle.TextColor3 = Palette.ForgeGlow
     NewsTitle.Font = Enum.Font.GothamBold
     NewsTitle.TextSize = 12
-    NewsTitle.BackgroundTransparency = 1
-    NewsTitle.Size = UDim2.new(1, 0, 0, 20)
     NewsTitle.TextXAlignment = Enum.TextXAlignment.Left
 
-    local ChangeLog = Instance.new("TextLabel", NewsCard)
-    ChangeLog.Size = UDim2.new(0.9, 0, 0, 50)
-    ChangeLog.Position = UDim2.new(0, 0, 0, 25)
-    ChangeLog.BackgroundTransparency = 1
-    ChangeLog.Text = "• Fixed Clickable Social Links\n• Refined Dashboard Layout\n• Improved UI Performance"
-    ChangeLog.TextColor3 = Palette.TextMuted
-    ChangeLog.Font = Enum.Font.Gotham
-    ChangeLog.TextSize = 13
-    ChangeLog.TextXAlignment = Enum.TextXAlignment.Left
-    ChangeLog.TextYAlignment = Enum.TextYAlignment.Top
+    local NewsDesc = Instance.new("TextLabel", NewsCard)
+    NewsDesc.Size = UDim2.new(0.9, 0, 0, 50)
+    NewsDesc.Position = UDim2.new(0, 0, 0, 25)
+    NewsDesc.BackgroundTransparency = 1
+    NewsDesc.Text = "• Fixed Tab Switching lag\n• Optimized Memory Usage\n• Added Live Ping/Uptime Statistics"
+    NewsDesc.TextColor3 = Palette.TextMuted
+    NewsDesc.Font = Enum.Font.Gotham
+    NewsDesc.TextSize = 13
+    NewsDesc.TextXAlignment = Enum.TextXAlignment.Left
+    NewsDesc.TextYAlignment = Enum.TextYAlignment.Top
+    NewsDesc.RichText = true
 end
 
 return Dashboard
