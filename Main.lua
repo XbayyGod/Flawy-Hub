@@ -214,8 +214,8 @@ local function AddTab(name)
     local IndicatorL = CreateIndicator(UDim2.new(0, -10, 0.5, 0), "IndicatorL")
     local IndicatorR = CreateIndicator(UDim2.new(1, 10, 0.5, 0), "IndicatorR")
 
+    -- [[ BAGIAN TAB SYSTEM DI MAIN.LUA ]]
     local function Switch()
-        -- Reset Sidebar
         for _, otherTab in pairs(Sidebar:GetChildren()) do
             if otherTab:IsA("TextButton") then
                 TweenService:Create(otherTab, TweenInfo.new(0.3), {TextColor3 = Canvas.TextMuted, BackgroundTransparency = 1}):Play()
@@ -226,21 +226,20 @@ local function AddTab(name)
             end
         end
 
-        -- FIX GHOSTING: Langsung sembunyikan halaman lama tanpa delay
+        -- FIX GHOSTING: Matikan halaman lama secara instan
         for _, otherPage in pairs(Container:GetChildren()) do
-            if otherPage:IsA("CanvasGroup") and otherPage.Visible then
-                otherPage.Visible = false -- Sembunyi instan
-                otherPage.GroupTransparency = 1 -- Reset transparansi
+            if otherPage:IsA("CanvasGroup") then
+                otherPage.Visible = false 
+                otherPage.GroupTransparency = 1
             end
         end
 
-        -- Animasi Tab Aktif
+        -- Aktifkan yang baru
         TweenService:Create(btn, TweenInfo.new(0.3), {TextColor3 = Canvas.TextMain, BackgroundTransparency = 0.95}):Play()
         IndicatorL.Visible = true; IndicatorR.Visible = true
         TweenService:Create(IndicatorL, TweenInfo.new(0.3), {Size = UDim2.new(0, 3, 0, 18)}):Play()
         TweenService:Create(IndicatorR, TweenInfo.new(0.3), {Size = UDim2.new(0, 3, 0, 18)}):Play()
         
-        -- Munculkan Halaman Baru
         TabPage.Visible = true
         TweenService:Create(TabPage, TweenInfo.new(0.3), {GroupTransparency = 0}):Play()
     end
