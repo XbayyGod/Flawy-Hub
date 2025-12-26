@@ -262,17 +262,17 @@ local CombatPage = AddTab("COMBAT")
 -- local AutoPage = AddTab("AUTOMATION")
 
 -- Load Konten dari GitHub (Pastiin link URL-nya bener ya, Bal!)
-local DashScript = GetExternal("https://raw.githubusercontent.com/UsernameLu/RepoLu/main/Dashboard.lua")
+local DashScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Dashboard.lua")
 if DashScript then 
     DashScript:Load(DashPage, Canvas) 
 end
 
-local DashScript = GetExternal("https://raw.githubusercontent.com/UsernameLu/RepoLu/main/Automation.lua")
+local DashScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Automation.lua")
 if DashScript then 
     DashScript:Load(DashPage, Canvas) 
 end
 
-local CombatScript = GetExternal("https://raw.githubusercontent.com/UsernameLu/RepoLu/main/Combat.lua")
+local CombatScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Combat.lua")
 if CombatScript then 
     CombatScript:Load(CombatPage, Canvas) 
 end
