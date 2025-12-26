@@ -32,7 +32,7 @@ local IsMaximized = false
 
 -- [[ UI ENGINE ]]
 local ScreenGui = Instance.new("ScreenGui", targetBase)
-ScreenGui.Name = "Flawy_TheForge_V1.1_Stable"
+ScreenGui.Name = "Flawy_TheForge_V1.1_Fixed"
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.ResetOnSpawn = false
 
@@ -122,26 +122,21 @@ SidePad.PaddingRight = UDim.new(0, 15)
 -- [[ CONTAINER ]]
 local Container = Instance.new("Frame", Main)
 Container.Name = "PageContainer"
-Container.Size = UDim2.new(1, -170, 1, -42)
+Container.Size = UDim2.new(1, -170, 1, -42) -- Area konten
 Container.Position = UDim2.new(0, 170, 0, 42)
 Container.BackgroundTransparency = 1
+Container.ClipsDescendants = true -- Supaya konten nggak meluber keluar
 
--- [[ FIXED STABLE DRAG LOGIC (No Jump, No Disappear) ]]
+-- [[ DRAG LOGIC ]]
 local function makeDraggable(obj, target, isToggle)
     local dragging, dragStart, startPos, dragMoved
-
     obj.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragMoved = false
-            dragStart = input.Position
-            startPos = target.Position
-
+            dragging = true; dragMoved = false; dragStart = input.Position; startPos = target.Position
             local connection
             connection = input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    connection:Disconnect()
+                    dragging = false; connection:Disconnect()
                     if isToggle and not dragMoved then
                         UI_Visible = not UI_Visible
                         Main.Visible = UI_Visible
@@ -150,13 +145,10 @@ local function makeDraggable(obj, target, isToggle)
             end)
         end
     end)
-
     UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
-            if delta.Magnitude > 5 then
-                dragMoved = true
-            end
+            if delta.Magnitude > 5 then dragMoved = true end
             target.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
@@ -184,11 +176,11 @@ Instance.new("UICorner", TBtn).CornerRadius = UDim.new(1, 0)
 makeDraggable(Header, Main, false)
 makeDraggable(TBtn, Toggle, true)
 
--- [[ TAB SYSTEM WITH SMOOTH TRANSITION ]]
+-- [[ TAB SYSTEM ]]
 local function AddTab(name)
     local TabPage = Instance.new("CanvasGroup", Container)
     TabPage.Name = name .. "_Page"
-    TabPage.Size = UDim2.new(1, 0, 1, 0)
+    TabPage.Size = UDim2.new(1, 0, 1, 0) -- Full ke Container
     TabPage.BackgroundTransparency = 1
     TabPage.Visible = false
     TabPage.GroupTransparency = 1
@@ -223,6 +215,7 @@ local function AddTab(name)
     local IndicatorR = CreateIndicator(UDim2.new(1, 10, 0.5, 0), "IndicatorR")
 
     local function Switch()
+        -- Reset Sidebar
         for _, otherTab in pairs(Sidebar:GetChildren()) do
             if otherTab:IsA("TextButton") then
                 TweenService:Create(otherTab, TweenInfo.new(0.3), {TextColor3 = Canvas.TextMuted, BackgroundTransparency = 1}):Play()
@@ -233,19 +226,21 @@ local function AddTab(name)
             end
         end
 
+        -- FIX GHOSTING: Langsung sembunyikan halaman lama tanpa delay
         for _, otherPage in pairs(Container:GetChildren()) do
             if otherPage:IsA("CanvasGroup") and otherPage.Visible then
-                TweenService:Create(otherPage, TweenInfo.new(0.2), {GroupTransparency = 1}):Play()
-                task.delay(0.2, function() otherPage.Visible = false end)
+                otherPage.Visible = false -- Sembunyi instan
+                otherPage.GroupTransparency = 1 -- Reset transparansi
             end
         end
 
+        -- Animasi Tab Aktif
         TweenService:Create(btn, TweenInfo.new(0.3), {TextColor3 = Canvas.TextMain, BackgroundTransparency = 0.95}):Play()
-        IndicatorL.Visible = true
-        IndicatorR.Visible = true
+        IndicatorL.Visible = true; IndicatorR.Visible = true
         TweenService:Create(IndicatorL, TweenInfo.new(0.3), {Size = UDim2.new(0, 3, 0, 18)}):Play()
         TweenService:Create(IndicatorR, TweenInfo.new(0.3), {Size = UDim2.new(0, 3, 0, 18)}):Play()
         
+        -- Munculkan Halaman Baru
         TabPage.Visible = true
         TweenService:Create(TabPage, TweenInfo.new(0.3), {GroupTransparency = 0}):Play()
     end
@@ -254,13 +249,14 @@ local function AddTab(name)
     return TabPage
 end
 
+-- [[ URUTAN TAB TETAP ]]
 local DashPage = AddTab("DASHBOARD")
 local AutoPage = AddTab("AUTOMATION")
 local CombatPage = AddTab("COMBAT")
 local VisualPage = AddTab("VISUALS")
 local SettingPage = AddTab("SETTINGS")
 
--- [[ LOAD EXTERNAL CONTENT - GANTI URL RAW LU ]]
+-- [[ LOAD EXTERNAL CONTENT ]]
 local DashScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Dashboard.lua")
 if DashScript then DashScript:Load(DashPage, Canvas) end
 
