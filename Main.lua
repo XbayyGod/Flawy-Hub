@@ -254,30 +254,32 @@ local function AddTab(name)
     return TabPage
 end
 
--- [[ SETUP TABS & EXTERNAL CONTENT ]]
 local DashPage = AddTab("DASHBOARD")
-local DashPage = AddTab("AUTOMATION")
+local AutoPage = AddTab("AUTOMATION")
 local CombatPage = AddTab("COMBAT")
--- Tambahin tab lain di sini kalau perlu, misal:
--- local AutoPage = AddTab("AUTOMATION")
+local VisualPage = AddTab("VISUALS")
+local SettingPage = AddTab("SETTINGS")
 
--- Load Konten dari GitHub (Pastiin link URL-nya bener ya, Bal!)
+-- [[ LOAD EXTERNAL CONTENT - GANTI URL RAW LU ]]
 local DashScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Dashboard.lua")
-if DashScript then 
-    DashScript:Load(DashPage, Canvas) 
-end
+if DashScript then DashScript:Load(DashPage, Canvas) end
 
-local DashScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Automation.lua")
-if DashScript then 
-    DashScript:Load(DashPage, Canvas) 
-end
+local AutoScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Automation.lua")
+if AutoScript then AutoScript:Load(AutoPage, Canvas) end
 
 local CombatScript = GetExternal("https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Combat.lua")
-if CombatScript then 
-    CombatScript:Load(CombatPage, Canvas) 
+if CombatScript then CombatScript:Load(CombatPage, Canvas) end
+
+-- [[ DEFAULT PAGE: DASHBOARD ]]
+task.wait(0.2)
+local dashBtn = Sidebar:FindFirstChild("DASHBOARD_Tab")
+if dashBtn then
+    dashBtn.TextColor3 = Canvas.TextMain
+    dashBtn.BackgroundTransparency = 0.95
+    dashBtn.IndicatorL.Visible = true; dashBtn.IndicatorR.Visible = true
+    dashBtn.IndicatorL.Size = UDim2.new(0, 3, 0, 18); dashBtn.IndicatorR.Size = UDim2.new(0, 3, 0, 18)
+    DashPage.Visible = true
+    DashPage.GroupTransparency = 0
 end
 
--- Print log biar lu tau script udah kelar nge-load
-print("The Forge 1.1 | Modular System for Muhamad Iqbal Active.")
-
-print("Flawy HUB | Forge 1.1 Final Stable Loaded.")
+print("Flawy HUB | Forge 1.1 Fixed Stable Loaded.")
