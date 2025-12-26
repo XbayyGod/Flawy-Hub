@@ -61,10 +61,8 @@ function Dashboard:Load(Parent, Palette)
     local startTime = os.time()
     task.spawn(function()
         while task.wait(1) do
-            local seconds = os.time() - startTime
-            local minutes = math.floor(seconds / 60)
-            local hours = math.floor(minutes / 60)
-            local ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 2000)
+            local currentTime = os.date("%H:%M:%S") 
+            local ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 1000) 
             UptimeLabel.Text = string.format("Time: %s | Ping: %d ms", currentTime, ping)
         end
     end)
