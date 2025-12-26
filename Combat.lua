@@ -2,13 +2,14 @@ local Combat = {}
 
 function Combat:Load(Parent, Palette)
     local Layout = Instance.new("UIListLayout", Parent)
-    Layout.SortOrder = Enum.SortOrder.LayoutOrder -- WAJIB
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder
     Layout.Padding = UDim.new(0, 10)
+    Instance.new("UIPadding", Parent).PaddingTop = UDim.new(0, 20)
+    Instance.new("UIPadding", Parent).PaddingLeft = UDim.new(0, 25)
 
-    -- Judul Modul (LayoutOrder 1)
     local Title = Instance.new("TextLabel", Parent)
-    Title.LayoutOrder = 1
-    Title.Size = UDim2.new(1, -40, 0, 30)
+    Title.LayoutOrder = 0
+    Title.Size = UDim2.new(1, -50, 0, 30)
     Title.BackgroundTransparency = 1
     Title.Text = "COMBAT MODULE"
     Title.TextColor3 = Palette.TextMain
@@ -16,9 +17,9 @@ function Combat:Load(Parent, Palette)
     Title.TextSize = 18
     Title.TextXAlignment = Enum.TextXAlignment.Left
 
-    local function CreateToggle(txt)
+    local function CreateToggle(txt, order)
         local btn = Instance.new("TextButton", Parent)
-        btn.LayoutOrder = 2 -- Di bawah Judul
+        btn.LayoutOrder = order
         btn.Size = UDim2.new(1, -50, 0, 40)
         btn.BackgroundColor3 = Palette.Sidebar
         btn.Text = "[ OFF ] " .. txt
@@ -35,9 +36,9 @@ function Combat:Load(Parent, Palette)
         end)
     end
 
-    CreateToggle("Kill Aura")
-    CreateToggle("Auto Block")
-    CreateToggle("Hitbox Expander")
+    CreateToggle("Kill Aura", 1)
+    CreateToggle("Auto Block", 2)
+    CreateToggle("Hitbox Expander", 3)
 end
 
 return Combat
