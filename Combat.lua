@@ -17,7 +17,7 @@ function Combat:Load(Parent, Palette)
 
     local function CreateToggle(txt)
         local btn = Instance.new("TextButton", Parent)
-        btn.Size = UDim2.new(0, 200, 0, 35)
+        btn.Size = UDim2.new(1, -50, 0, 40)
         btn.BackgroundColor3 = Palette.Sidebar
         btn.Text = "[ OFF ] " .. txt
         btn.TextColor3 = Palette.TextMuted

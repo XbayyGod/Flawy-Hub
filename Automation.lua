@@ -18,7 +18,7 @@ function Automation:Load(Parent, Palette)
     -- Contoh Tombol Fitur (Gua buatin simpel dlu Bal)
     local function CreateButton(txt)
         local btn = Instance.new("TextButton", Parent)
-        btn.Size = UDim2.new(0, 200, 0, 35)
+        btn.Size = UDim2.new(1, -50, 0, 40)
         btn.BackgroundColor3 = Palette.Sidebar
         btn.Text = txt
         btn.TextColor3 = Palette.TextMuted
