@@ -40,7 +40,7 @@ function Dashboard:Load(Parent, Palette)
     Greet.Size = UDim2.new(1, 0, 0, 40)
     Greet.Position = UDim2.new(0, 0, 0, 15)
     Greet.BackgroundTransparency = 1
-    Greet.Text = "FLAWY HUB <font color='#00C8FF'>v1.1</font> | AUTHENTICATED"
+    Greet.Text = "FLAWY HUB | <font color='#00C8FF'>V1</font>"
     Greet.RichText = true
     Greet.TextColor3 = Palette.TextMain
     Greet.Font = Enum.Font.GothamBold
@@ -51,7 +51,7 @@ function Dashboard:Load(Parent, Palette)
     UptimeLabel.Size = UDim2.new(1, 0, 0, 20)
     UptimeLabel.Position = UDim2.new(0, 0, 0, 45)
     UptimeLabel.BackgroundTransparency = 1
-    UptimeLabel.Text = "Uptime: 00:00:00 | Ping: ... ms"
+    UptimeLabel.Text = "Time: 00:00:00 | Ping: ... ms"
     UptimeLabel.TextColor3 = Palette.TextMuted
     UptimeLabel.Font = Enum.Font.GothamMedium
     UptimeLabel.TextSize = 13
