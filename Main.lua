@@ -540,7 +540,7 @@ function Engine:CreateSlider(parent, text, min, max, default, order, callback)
         
         TweenService:Create(fill, TweenInfo.new(0.1), {Size = UDim2.new(percent, 0, 1, 0)}):Play()
         TweenService:Create(knob, TweenInfo.new(0.1), {Position = UDim2.new(percent, 0, 0.5, 0)}):Play()
-        
+            
         callback(clampedValue)
     end
 
@@ -1086,7 +1086,777 @@ function Engine:LoadFeature(fileName, url, targetPage)
     end
 end
 
--- [[ EXECUTION ]]
+-- ================================
+-- AUTO FARM MODULE
+-- ================================
+local AutoFarm = {}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local State = {
+    Height_Offset = 2,
+    Travel_Speed = 60,
+    IsMining = false,
+    SelectedResource = {}, 
+    IsFarmingMob = false,
+    SelectedMob = "None",
+    CurrentTarget = nil,
+    IsFlying = false,
+    FlyHeight = 10 -- Tinggi default terbang saat idle
+}
+
+local EngineConnection = nil
+local AttackLoop = nil
+local NoclipLoop = nil
+local FlyLoop = nil
+local CurrentResDropdown = nil
+local CurrentMobDropdown = nil
+
+-- [[ 1. FULL RESET & CLEANUP ]]
+local function ResetCharacter()
+    State.IsMining = false
+    State.IsFarmingMob = false
+    State.CurrentTarget = nil
+    State.IsFlying = false
+    
+    if EngineConnection then EngineConnection:Disconnect(); EngineConnection = nil end
+    if NoclipLoop then task.cancel(NoclipLoop); NoclipLoop = nil end
+    if AttackLoop then task.cancel(AttackLoop); AttackLoop = nil end
+    if FlyLoop then task.cancel(FlyLoop); FlyLoop = nil end
+
+    local Char = Players.LocalPlayer.Character
+    if Char then
+        local Hum = Char:FindFirstChildOfClass("Humanoid")
+        if Hum then
+            Hum.PlatformStand = false
+            Hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+        for _, v in ipairs(Char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = true
+            end
+        end
+    end
+end
+
+-- [[ 2. PERMANENT NOCLIP LOOP ]]
+local function StartNoclip()
+    if NoclipLoop then task.cancel(NoclipLoop) end
+    NoclipLoop = task.spawn(function()
+        while State.IsMining or State.IsFarmingMob do
+            local Char = Players.LocalPlayer.Character
+            if Char then
+                for _, v in ipairs(Char:GetDescendants()) do
+                    if v:IsA("BasePart") and v.CanCollide then
+                        v.CanCollide = false
+                    end
+                end
+            end
+            task.wait()
+        end
+    end)
+end
+
+-- [[ 3. FLY SYSTEM - KARAKTER TERBANG SAAT TARGET HABIS ]]
+local function StartFlySystem()
+    if FlyLoop then task.cancel(FlyLoop) end
+    
+    FlyLoop = task.spawn(function()
+        local Char = Players.LocalPlayer.Character
+        local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+        if not Root then return end
+        
+        State.IsFlying = true
+        
+        while State.IsFlying do
+            local currentPos = Root.Position
+            local targetHeight = State.FlyHeight
+            local targetPos = Vector3.new(currentPos.X, targetHeight, currentPos.Z)
+            
+            -- Smooth movement ke target height
+            local distance = (targetPos - currentPos).Magnitude
+            if distance > 0.1 then
+                local moveStep = 50 * task.wait() -- Kecepatan naik/turun
+                if moveStep > distance then moveStep = distance end
+                
+                local direction = (targetPos - currentPos).Unit
+                Root.CFrame = CFrame.new(currentPos + (direction * moveStep))
+            end
+            
+            -- Putar perlahan di tempat untuk mencari target
+            Root.CFrame = Root.CFrame * CFrame.Angles(0, math.rad(1), 0)
+            
+            task.wait()
+        end
+    end)
+end
+
+-- [[ 4. AGGRESSIVE SCANNER DENGAN FIXED RANGE 1000 ]]
+local function GetNearest()
+    local Char = Players.LocalPlayer.Character
+    local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+    if not Root then return nil end
+
+    local Closest, ClosestDist = nil, 1000 -- Fixed range 1000 studs
+    
+    for _, Obj in pairs(workspace:GetDescendants()) do
+        local Valid = false
+        if State.IsMining then
+            if table.find(State.SelectedResource, Obj.Name) then
+                local HP = Obj:GetAttribute("Health") or (Obj:FindFirstChild("HP") and Obj.HP.Value) or 100
+                Valid = (HP > 0)
+            end
+        elseif State.IsFarmingMob then
+            if Obj.Name:find(State.SelectedMob) and Obj:FindFirstChildOfClass("Humanoid") then
+                local Hum = Obj:FindFirstChildOfClass("Humanoid")
+                Valid = (Hum and Hum.Health > 0)
+            end
+        end
+
+        if Valid and Obj.Parent then
+            local Pos = Obj:IsA("Model") and Obj:GetPivot().Position or (Obj:IsA("BasePart") and Obj.Position)
+            if Pos then
+                local Dist = (Root.Position - Pos).Magnitude
+                if Dist < ClosestDist then
+                    ClosestDist = Dist
+                    Closest = Obj
+                end
+            end
+        end
+    end
+    
+    -- Jika ada target, matikan flying mode
+    if Closest then
+        State.IsFlying = false
+        if FlyLoop then
+            task.cancel(FlyLoop)
+            FlyLoop = nil
+        end
+    else
+        -- Jika tidak ada target, aktifkan flying mode
+        if not State.IsFlying then
+            StartFlySystem()
+        end
+    end
+    
+    return Closest
+end
+
+-- [[ 5. PERBAIKAN MOVEMENT ENGINE DENGAN HEIGHT OFFSET REAL ]]
+local function StartMovementEngine()
+    if EngineConnection then EngineConnection:Disconnect() end
+    StartNoclip()
+    
+    EngineConnection = RunService.RenderStepped:Connect(function(dt)
+        if not State.IsMining and not State.IsFarmingMob then return end
+        
+        local Char = Players.LocalPlayer.Character
+        local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+        local Hum = Char and Char:FindFirstChildOfClass("Humanoid")
+        if not Root or not Hum then return end
+
+        Hum.PlatformStand = true 
+        Root.Velocity = Vector3.new(0,0,0)
+
+        if not State.CurrentTarget or not State.CurrentTarget.Parent then
+            State.CurrentTarget = GetNearest()
+            -- Jika tidak ada target, biarkan fly system mengontrol
+            if not State.CurrentTarget then
+                return
+            end
+        else
+            local Dead = false
+            if State.IsFarmingMob then
+                local mHum = State.CurrentTarget:FindFirstChildOfClass("Humanoid")
+                if not mHum or mHum.Health <= 0 then Dead = true end
+            else
+                local oHP = State.CurrentTarget:GetAttribute("Health") or (State.CurrentTarget:FindFirstChild("HP") and State.CurrentTarget.HP.Value) or 100
+                if oHP <= 0 then Dead = true end
+            end
+            if Dead then 
+                State.CurrentTarget = nil
+                return
+            end
+        end
+
+        if State.CurrentTarget then
+            local TPosRaw = State.CurrentTarget:IsA("Model") and State.CurrentTarget:GetPivot().Position or State.CurrentTarget.Position
+            
+            -- [[ HEIGHT OFFSET REAL - SESUAI INPUT USER ]]
+            local TPos = Vector3.new(
+                TPosRaw.X,
+                TPosRaw.Y + State.Height_Offset, -- Gunakan offset langsung dari user
+                TPosRaw.Z
+            )
+            
+            local Distance = (Root.Position - TPos).Magnitude
+            
+            -- Hitung posisi untuk melihat target (lookAt)
+            local LookPos = Vector3.new(TPosRaw.X, TPosRaw.Y + 1, TPosRaw.Z) -- Lihat ke tengah target
+            
+            if Distance > 0.1 then
+                local MoveStep = State.Travel_Speed * dt
+                if MoveStep > Distance then MoveStep = Distance end
+                
+                local NewPos = Root.Position + ((TPos - Root.Position).Unit * MoveStep)
+                Root.CFrame = CFrame.lookAt(NewPos, LookPos)
+            else
+                Root.CFrame = CFrame.lookAt(TPos, LookPos)
+            end
+        end
+    end)
+end
+
+-- [[ 6. ATTACK ENGINE ]]
+local function StartAttackEngine()
+    if AttackLoop then task.cancel(AttackLoop) end
+    AttackLoop = task.spawn(function()
+        local RF = ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Packages"):WaitForChild("Knit"):WaitForChild("Services"):WaitForChild("ToolService"):WaitForChild("RF"):WaitForChild("ToolActivated")
+        while (State.IsMining or State.IsFarmingMob) do
+            if State.CurrentTarget then
+                pcall(function()
+                    RF:InvokeServer(State.IsMining and "Pickaxe" or "Weapon")
+                end)
+            end
+            task.wait(0) 
+        end
+    end)
+end
+
+-- [[ 7. UI LOADER YANG DISEDERHANAKAN ]]
+function AutoFarm:Load(Parent, Palette, Engine) 
+    Engine:CreateSection(Parent, "Tween Setting", 1)
+    
+    -- Height Offset dengan info real
+    Engine:CreateSlider(Parent, "Height Offset (Units)", -10, 20, State.Height_Offset, 2, function(val) 
+        State.Height_Offset = val 
+        -- Info: 1 unit = 1 stud = tinggi karakter Roblox
+    end)
+    
+    Engine:CreateSlider(Parent, "Fly Speed", 20, 300, State.Travel_Speed, 3, function(val) 
+        State.Travel_Speed = val 
+    end)
+
+    -- ORES
+    Engine:CreateSection(Parent, "Farm Ores", 4)
+    local OreData = {
+        ["Stonewake's Cross"] = {"Pebble", "Rock", "Boulder", "Lucky Block"},
+        ["Forgotten Kingdom"] = {"Basalt Rock", "Basalt Core", "Basalt Vein", "Volcanic Rock", "Light Crystal", "Earth Crystal", "Violet Crystal", "Crimson Crystal", "Cyan Crystal"},
+        ["Frostspire Expanse"] = {"Icy Pebble", "Icy Rock", "Icy Boulder", "Small Ice Crystal", "Medium Ice Crystal", "Large Ice Crystal", "Floating Crystal", "Iceberg"}
+    }
+    Engine:CreateDropdown(Parent, "Select Island (Ore)", {"Stonewake's Cross", "Forgotten Kingdom", "Frostspire Expanse"}, 5, function(val)
+        if CurrentResDropdown then pcall(function() CurrentResDropdown.Frame:Destroy() end) end
+        CurrentResDropdown = Engine:CreateDropdown(Parent, "Select Rocks", OreData[val] or {}, 6, true, function(res) 
+            State.SelectedResource = res 
+        end)
+    end)
+    Engine:CreateToggle(Parent, "Start Farm Ore", 7, function(state)
+        if state then 
+            ResetCharacter()
+            State.IsMining = true
+            StartMovementEngine() 
+            StartAttackEngine() 
+        else 
+            ResetCharacter() 
+        end
+    end)
+
+    -- MONSTERS
+    Engine:CreateSection(Parent, "Farm Monsters", 8)
+    local MobData = {
+        ["Iron Valley"] = {"Zombie", "Elite Zombie", "Delver Zombie", "Brute Zombie"},
+        ["Forgotten Kingdom"] = {"Bomber", "Slime", "Blazing Slime", "Skeleton Rogue", "Axe Skeleton", "Deathaxe Skeleton", "Elite Rogue Skeleton", "Elite Deathaxe Skeleton", "Blight Pyromancer", "Reaper"},
+        ["Frostspire Expanse"] = {"Crystal Spider", "Diamond Spider", "Prismarine Spider", "Mini Demonic Spider", "Demonic Spider", "Demonic Queen Spider", "Common Orc", "Elite Orc", "Yeti", "Crystal Golem"}
+    }
+    Engine:CreateDropdown(Parent, "Select Island (Mob)", {"Iron Valley", "Forgotten Kingdom", "Frostspire Expanse"}, 9, function(val)
+        if CurrentMobDropdown then pcall(function() CurrentMobDropdown.Frame:Destroy() end) end
+        CurrentMobDropdown = Engine:CreateDropdown(Parent, "Select Monster", MobData[val] or {}, 10, false, function(mob) 
+            State.SelectedMob = mob 
+        end)
+    end)
+    Engine:CreateToggle(Parent, "Start Farm Mobs", 11, function(state)
+        if state then 
+            ResetCharacter()
+            State.IsFarmingMob = true
+            StartMovementEngine() 
+            StartAttackEngine() 
+        else 
+            ResetCharacter() 
+        end
+    end)
+    
+end
+
+-- ================================
+-- DASHBOARD MODULE
+-- ================================
+local Dashboard = {}
+
+function Dashboard:Load(Parent, Palette)
+    local TweenService = game:GetService("TweenService")
+    local Players = game:GetService("Players")
+    local lp = Players.LocalPlayer
+    
+    -- [[ LAYOUT SETTINGS ]]
+    local Layout = Instance.new("UIListLayout", Parent)
+    Layout.SortOrder = Enum.SortOrder.LayoutOrder
+    Layout.Padding = UDim.new(0, 18) -- Jarak antar widget lebih lega
+
+    local MainPad = Instance.new("UIPadding", Parent)
+    MainPad.PaddingTop = UDim.new(0, 25)
+    MainPad.PaddingLeft = UDim.new(0, 30)
+    MainPad.PaddingRight = UDim.new(0, 30)
+
+    -- [[ HELPER: CREATE BIG CARD ]]
+    local function CreateWidget(name, order, height)
+        local frame = Instance.new("Frame", Parent)
+        frame.Name = name .. "_Widget"
+        frame.LayoutOrder = order
+        frame.Size = UDim2.new(1, 0, 0, height or 100)
+        frame.BackgroundColor3 = Palette.Sidebar
+        frame.BorderSizePixel = 0
+        
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+        local stroke = Instance.new("UIStroke", frame)
+        stroke.Color = Palette.Border
+        stroke.Thickness = 1.5
+        
+        return frame
+    end
+
+    -- [[ 1. STATUS WIDGET (FONT GEDE) ]]
+    local StatusW = CreateWidget("Status", 1, 95)
+    local Glow = Instance.new("Frame", StatusW)
+    Glow.Size = UDim2.new(0, 5, 1, -30)
+    Glow.Position = UDim2.new(0, 18, 0, 15)
+    Glow.BackgroundColor3 = Palette.ForgeGlow
+    Glow.BorderSizePixel = 0
+    Instance.new("UICorner", Glow).CornerRadius = UDim.new(1, 0)
+
+    local Title = Instance.new("TextLabel", StatusW)
+    Title.Size = UDim2.new(1, -50, 0, 35)
+    Title.Position = UDim2.new(0, 35, 0, 15)
+    Title.BackgroundTransparency = 1
+    Title.Text = "FLAWY HUB <font color='#00C8FF'>V1</font>"
+    Title.RichText = true
+    Title.TextColor3 = Palette.TextMain
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 24 -- GEDEIN
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+
+    local StatsLabel = Instance.new("TextLabel", StatusW)
+    StatsLabel.Size = UDim2.new(1, -50, 0, 25)
+    StatsLabel.Position = UDim2.new(0, 35, 0, 50)
+    StatsLabel.BackgroundTransparency = 1
+    StatsLabel.Text = "Loading system time..."
+    StatsLabel.TextColor3 = Palette.TextMuted
+    StatsLabel.Font = Enum.Font.GothamMedium
+    StatsLabel.TextSize = 16 -- GEDEIN
+    StatsLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    task.spawn(function()
+        while task.wait(1) do
+            local time = os.date("%H:%M:%S")
+            local ping = math.floor(lp:GetNetworkPing() * 1000)
+            StatsLabel.Text = "Time: " .. time .. "  |  Ping: " .. ping .. "ms"
+        end
+    end)
+
+    -- [[ 2. SOCIAL LINKS (CLEAN) ]]
+    local SocialW = CreateWidget("Socials", 2, 85)
+    local SLayout = Instance.new("UIListLayout", SocialW)
+    SLayout.FillDirection = Enum.FillDirection.Horizontal
+    SLayout.Padding = UDim.new(0, 15)
+    SLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    SLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local function CreateLinkBtn(name, color, link)
+        local btn = Instance.new("TextButton", SocialW)
+        btn.Size = UDim2.new(0.3, -10, 0, 45) -- Tombol lebih tinggi
+        btn.BackgroundColor3 = Palette.Header
+        btn.Text = name
+        btn.TextColor3 = Palette.TextMain
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 13 -- Lebih kebaca
+        btn.AutoButtonColor = false
+        
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        local bStroke = Instance.new("UIStroke", btn)
+        bStroke.Color = color
+        bStroke.Thickness = 1.5
+        bStroke.Transparency = 0.5
+
+        btn.MouseButton1Click:Connect(function() 
+            if setclipboard then setclipboard(link) end 
+            btn.BackgroundColor3 = color
+            task.wait(0.1)
+            btn.BackgroundColor3 = Palette.Header
+        end)
+    end
+
+    CreateLinkBtn("DISCORD", Color3.fromRGB(75, 85, 180), "https://discord.gg/linklu")
+    CreateLinkBtn("TIKTOK", Color3.fromRGB(180, 50, 80), "https://tiktok.com/@linklu")
+    CreateLinkBtn("YOUTUBE", Color3.fromRGB(180, 30, 30), "https://youtube.com/linklu")
+end
+
+-- ================================
+-- ESP MODULE
+-- ================================
+local Esp = {}
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local CoreGui = game:GetService("CoreGui")
+
+-- [[ 1. ULTRA PERFORMANCE CONFIG ]]
+local RENDER_DISTANCE = 1500     -- Jarak maksimal teks muncul
+local HIGHLIGHT_DISTANCE = 300   -- Highlight cuma nyala kalau dekat (Hemat GPU)
+local MAX_HIGHLIGHTS = 15        -- [BARU] Maksimal jumlah highlight di layar (Biar ga kedip/lag)
+local REFRESH_RATE = 0.1         -- Update rate UI
+
+-- [TIPS] Kalau tau foldernya, ganti workspace jadi foldernya. Contoh: workspace.Mobs
+-- Kalau nil, dia bakal scan satu map (Default)
+local TARGET_SCAN_PARENT = workspace 
+
+-- [[ 2. DATABASE ORE ]]
+local RockConfig = {
+    -- Es & Crystal
+    ["Icy Pebble"] = {Color = Color3.fromRGB(0, 255, 255)},
+    ["Icy Rock"] = {Color = Color3.fromRGB(0, 200, 255)},
+    ["Icy Boulder"] = {Color = Color3.fromRGB(0, 150, 255)},
+    ["Small Ice Crystal"] = {Color = Color3.fromRGB(150, 255, 255)},
+    ["Medium Ice Crystal"] = {Color = Color3.fromRGB(100, 255, 255)},
+    ["Floating Crystal"] = {Color = Color3.fromRGB(0, 255, 100)}, 
+    ["Iceberg"] = {Color = Color3.fromRGB(0, 0, 255)},
+    -- Api & Basalt
+    ["Basalt Rock"] = {Color = Color3.fromRGB(255, 100, 0)},
+    ["Basalt Core"] = {Color = Color3.fromRGB(255, 50, 0)},
+    ["Basalt Vein"] = {Color = Color3.fromRGB(255, 0, 0)},
+    ["Volcanic Rock"] = {Color = Color3.fromRGB(200, 0, 0)},
+    -- Lainnya
+    ["Earth Crystal"] = {Color = Color3.fromRGB(50, 255, 50)},
+    ["Violet Crystal"] = {Color = Color3.fromRGB(170, 0, 255)},
+    ["Pebble"] = {Color = Color3.fromRGB(200, 200, 200)},
+    ["Rock"] = {Color = Color3.fromRGB(150, 150, 150)},
+    ["Boulder"] = {Color = Color3.fromRGB(100, 100, 100)},
+    ["Lucky Block"] = {Color = Color3.fromRGB(255, 215, 0)}, 
+}
+
+-- [[ 3. DATABASE ENEMY ]]
+local EnemyConfig = {
+    ["Zombie"] = Color3.fromRGB(100, 255, 100),
+    ["Elite Zombie"] = Color3.fromRGB(0, 255, 0),
+    ["Brute Zombie"] = Color3.fromRGB(30, 100, 30),
+    ["Delver Zombie"] = Color3.fromRGB(0, 255, 255),
+    ["Skeleton Rogue"] = Color3.fromRGB(220, 220, 220),
+    ["Axe Skeleton"] = Color3.fromRGB(180, 180, 180),
+    ["Deathaxe Skeleton"] = Color3.fromRGB(100, 100, 100),
+    ["Elite Rogue Skeleton"] = Color3.fromRGB(200, 200, 255),
+    ["Elite Deathaxe Skeleton"] = Color3.fromRGB(50, 50, 50),
+    ["Slime"] = Color3.fromRGB(150, 255, 150),
+    ["Blazing Slime"] = Color3.fromRGB(255, 120, 0),
+    ["Bomber"] = Color3.fromRGB(255, 255, 0),
+    ["Blight Pyromancer"] = Color3.fromRGB(255, 80, 0),
+    ["Crystal Spider"] = Color3.fromRGB(170, 255, 255),
+    ["Diamond Spider"] = Color3.fromRGB(0, 150, 255),
+    ["Mini Demonic Spider"] = Color3.fromRGB(150, 0, 0),
+    ["Demonic Spider"] = Color3.fromRGB(100, 0, 0),
+    ["Demonic Queen Spider"] = Color3.fromRGB(255, 0, 100),
+    ["Prismarine Spider"] = Color3.fromRGB(0, 255, 200),
+    ["Common Orc"] = Color3.fromRGB(150, 100, 50),
+    ["Elite Orc"] = Color3.fromRGB(100, 50, 0),
+    ["Yeti"] = Color3.fromRGB(255, 255, 255),
+    ["Reaper"] = Color3.fromRGB(255, 0, 0),
+    ["Crystal Golem"] = Color3.fromRGB(170, 0, 255),
+}
+
+-- [[ 4. SYSTEM VARIABLES ]]
+local EspState = {
+    Enabled = false,      
+    EnemyEnabled = false,  
+    SelectedOres = {},
+    SelectedEnemies = {},
+    Cache = {}, 
+    Connections = {},
+    IsRunning = false
+}
+
+if CoreGui:FindFirstChild("FPerformance") then
+    CoreGui.FPerformance:Destroy()
+end
+local ESP_Folder = Instance.new("Folder", CoreGui)
+ESP_Folder.Name = "FPerformance"
+
+-- [[ 5. HELPER FUNCTIONS ]]
+local function GetCleanName(RawName)
+    local cleaned = string.gsub(RawName, "%d+$", "") 
+    cleaned = string.gsub(cleaned, "^%s*(.-)%s*$", "%1")
+    return cleaned
+end
+
+local function GetHealth(Obj)
+    local Attr = Obj:GetAttribute("Health") or Obj:GetAttribute("HP") or Obj:GetAttribute("Durability")
+    if Attr then return Attr end
+
+    local Val = Obj:FindFirstChild("Health", true) or Obj:FindFirstChild("HP", true) or Obj:FindFirstChild("Durability", true)
+    if Val and Val:IsA("ValueBase") then return Val.Value end
+    
+    local Hum = Obj:FindFirstChildOfClass("Humanoid")
+    if Hum then return Hum.Health end
+
+    return nil 
+end
+
+-- [[ 6. CORE LOGIC ]]
+local function RemoveEspObj(Obj)
+    if EspState.Cache[Obj] then
+        if EspState.Cache[Obj].Highlight then EspState.Cache[Obj].Highlight:Destroy() end
+        if EspState.Cache[Obj].Billboard then EspState.Cache[Obj].Billboard:Destroy() end
+        EspState.Cache[Obj] = nil
+    end
+end
+
+local function AddEspObj(Obj)
+    -- [OPTIMISASI 1] Filter Level 1 - Validasi Instance
+    -- Kita cuma peduli Model (Monster/Ore biasanya Model) atau Part.
+    if not Obj:IsA("Model") and not Obj:IsA("BasePart") then return end
+    if EspState.Cache[Obj] then return end 
+
+    -- [OPTIMISASI 2] Bersihin Nama sekali aja di awal
+    local RawName = Obj.Name
+    local CleanName = GetCleanName(RawName) 
+    
+    local IsTargetOre = false
+    local IsTargetEnemy = false
+
+    -- Cek Ore 
+    if EspState.Enabled and table.find(EspState.SelectedOres, RawName) then
+        IsTargetOre = true
+    end
+
+    -- Cek Enemy 
+    if EspState.EnemyEnabled and table.find(EspState.SelectedEnemies, CleanName) then
+        IsTargetEnemy = true
+    end
+
+    if not IsTargetOre and not IsTargetEnemy then return end
+
+    -- [OPTIMISASI 3] Cek Darah
+    local HP = GetHealth(Obj)
+    if not HP then return end
+
+    -- Warna
+    local FinalColor = Color3.fromRGB(255, 255, 255)
+    if IsTargetEnemy then
+        FinalColor = EnemyConfig[CleanName] or Color3.fromRGB(255, 0, 0)
+    elseif IsTargetOre then
+        local ConfigData = RockConfig[RawName]
+        if ConfigData then FinalColor = ConfigData.Color end
+    end
+    
+    -- Setup Visual (Default OFF semua biar ringan)
+    local Highlight = Instance.new("Highlight")
+    Highlight.Name = "HL"
+    Highlight.Adornee = Obj
+    Highlight.FillColor = FinalColor
+    Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    Highlight.FillTransparency = 0.5
+    Highlight.OutlineTransparency = 0.5 -- Kurangi outline biar FPS naik dikit
+    Highlight.Enabled = false 
+    Highlight.Parent = ESP_Folder
+
+    local Billboard = Instance.new("BillboardGui")
+    Billboard.Name = "BG"
+    Billboard.Adornee = Obj
+    Billboard.Size = UDim2.new(0, 150, 0, 50)
+    Billboard.StudsOffset = Vector3.new(0, 2, 0)
+    Billboard.AlwaysOnTop = true
+    Billboard.Enabled = false 
+    Billboard.Parent = ESP_Folder
+    
+    local Label = Instance.new("TextLabel", Billboard)
+    Label.Size = UDim2.new(1, 0, 1, 0)
+    Label.BackgroundTransparency = 1
+    Label.TextColor3 = FinalColor
+    Label.TextStrokeTransparency = 0
+    Label.Font = Enum.Font.GothamBold
+    Label.TextSize = 10 -- Kecilin size (lebih ringan render font kecil)
+    Label.Text = "" 
+
+    EspState.Cache[Obj] = {
+        Highlight = Highlight,
+        Billboard = Billboard,
+        Label = Label,
+        HP = HP,
+        Name = CleanName,
+        Root = (Obj:IsA("Model") and Obj.PrimaryPart) or Obj
+    }
+
+    local RemovingConn
+    RemovingConn = Obj.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            RemoveEspObj(Obj)
+            RemovingConn:Disconnect()
+        end
+    end)
+end
+
+-- [[ 7. LOOP MANAGER (HEAVY OPTIMIZATION) ]]
+local function StopESP()
+    ESP_Folder:ClearAllChildren()
+    EspState.Cache = {}
+    for _, conn in pairs(EspState.Connections) do conn:Disconnect() end
+    EspState.Connections = {}
+    EspState.IsRunning = false
+end
+
+local function StartESP()
+    if EspState.IsRunning then return end
+    EspState.IsRunning = true
+
+    -- Scan Awal
+    for _, child in pairs(TARGET_SCAN_PARENT:GetDescendants()) do
+        task.spawn(function() AddEspObj(child) end)
+    end
+
+    -- Listener Baru (Dioptimalkan)
+    local AddedConn = TARGET_SCAN_PARENT.DescendantAdded:Connect(function(child)
+        -- Cek Toggle dulu sebelum proses apapun
+        if not (EspState.Enabled or EspState.EnemyEnabled) then return end
+        
+        -- Langsung filter kalau bukan Model/Part (Hemat CPU)
+        if not child:IsA("Model") and not child:IsA("BasePart") then return end
+        
+        AddEspObj(child) 
+    end)
+    table.insert(EspState.Connections, AddedConn)
+
+    -- Render Loop
+    local Timer = 0
+    local RenderConn = RunService.Heartbeat:Connect(function(deltaTime)
+        Timer = Timer + deltaTime
+        if Timer < REFRESH_RATE then return end 
+        Timer = 0 
+
+        local Player = Players.LocalPlayer
+        local Char = Player.Character
+        local Root = Char and Char:FindFirstChild("HumanoidRootPart")
+        
+        if not Root then return end
+        local MyPos = Root.Position
+
+        -- Hitung jumlah highlight yang aktif frame ini
+        local ActiveHighlights = 0
+
+        for Obj, Data in pairs(EspState.Cache) do
+            if Obj.Parent then
+                local TargetPos = (Obj:IsA("Model") and Obj:GetPivot().Position) or Obj.Position
+                local Dist = (MyPos - TargetPos).Magnitude
+
+                if Dist > RENDER_DISTANCE then
+                    -- Jauh -> Matikan Total
+                    if Data.Billboard.Enabled then Data.Billboard.Enabled = false end
+                    if Data.Highlight.Enabled then Data.Highlight.Enabled = false end
+                else
+                    -- Dekat -> Nyalakan Teks
+                    Data.Billboard.Enabled = true
+                    Data.Label.Text = string.format("%s\nHP: %s\n[%dm]", Data.Name, tostring(Data.HP), math.floor(Dist))
+                    
+                    -- [OPTIMISASI 4] Smart Highlight Limiter
+                    -- Cuma nyalakan highlight kalau:
+                    -- 1. Jarak deket (HIGHLIGHT_DISTANCE)
+                    -- 2. Slot highlight belum penuh (MAX_HIGHLIGHTS)
+                    if Dist < HIGHLIGHT_DISTANCE and ActiveHighlights < MAX_HIGHLIGHTS then
+                        Data.Highlight.Enabled = true
+                        ActiveHighlights = ActiveHighlights + 1
+                    else
+                        Data.Highlight.Enabled = false
+                    end
+                end
+            else
+                RemoveEspObj(Obj)
+            end
+        end
+    end)
+    table.insert(EspState.Connections, RenderConn)
+end
+
+local function UpdateStatus()
+    if EspState.Enabled or EspState.EnemyEnabled then
+        if not EspState.IsRunning then
+            StartESP()
+        end
+        -- Re-scan kalau toggle berubah
+        for _, child in pairs(TARGET_SCAN_PARENT:GetDescendants()) do
+             task.spawn(function() AddEspObj(child) end)
+        end
+    else
+        StopESP()
+    end
+end
+
+-- [[ 8. UI LOADER ]]
+function Esp:Load(Parent, Palette, Engine) 
+    
+    -- ORE
+    Engine:CreateSection(Parent, "ESP ORE", 1)
+
+    local OreList = {}
+    for Name, _ in pairs(RockConfig) do table.insert(OreList, Name) end
+    table.sort(OreList)
+
+    Engine:CreateDropdown(Parent, "Select Ores", OreList, 3, true, function(Selected)
+        EspState.SelectedOres = Selected
+        if EspState.Enabled then 
+            for Obj, Data in pairs(EspState.Cache) do
+                 if RockConfig[Data.Name] and not table.find(Selected, Data.Name) then 
+                      RemoveEspObj(Obj)
+                 end
+            end
+            UpdateStatus()
+        end
+    end)
+
+    Engine:CreateToggle(Parent, "Enable Ore ESP", 2, function(Value)
+        EspState.Enabled = Value
+        UpdateStatus()
+    end)
+
+    
+    
+    -- ENEMY
+    Engine:CreateSection(Parent, "ESP ENEMY", 6)
+
+    local EnemyNames = {}
+    for Name, _ in pairs(EnemyConfig) do table.insert(EnemyNames, Name) end
+    table.sort(EnemyNames) 
+
+    Engine:CreateDropdown(Parent, "Select Enemies", EnemyNames, 8, true, function(Selected)
+        EspState.SelectedEnemies = Selected
+        if EspState.EnemyEnabled then 
+             for Obj, Data in pairs(EspState.Cache) do
+                 if EnemyConfig[Data.Name] and not table.find(Selected, Data.Name) then
+                      RemoveEspObj(Obj)
+                 end
+            end
+            UpdateStatus()
+        end
+    end)
+
+    Engine:CreateToggle(Parent, "Enable Enemy ESP", 7, function(Val)
+        EspState.EnemyEnabled = Val
+        UpdateStatus()
+    end)
+
+    Engine:CreateSpacer(Parent, 10, 9)
+    Engine:CreateSlider(Parent, "Render Dist", 500, 1000, 500, 100, function(Val)
+        RENDER_DISTANCE = Val
+    end)
+end
+
+-- ================================
+-- MAIN EXECUTION
+-- ================================
 Engine:Init()
 
 local DashPage = Engine:AddTab("DASHBOARD", nil, 1)
@@ -1094,9 +1864,10 @@ local AutoPage = Engine:AddTab("AUTO FARM", nil, 2)
 local EspPage = Engine:AddTab("ESP", nil, 3)
 
 task.spawn(function()
-    Engine:LoadFeature("Dashboard.lua", "https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Dashboard.lua", DashPage)
-    Engine:LoadFeature("AutoFarm.lua", "https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/AutoFarm.lua", AutoPage)
-    Engine:LoadFeature("Esp.lua", "https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Esp.lua", EspPage)
+    -- Load modules directly from memory
+    Dashboard:Load(DashPage, Engine.Palette)
+    AutoFarm:Load(AutoPage, Engine.Palette, Engine)
+    Esp:Load(EspPage, Engine.Palette, Engine)
 
     if Engine.SidebarContent:FindFirstChild("DASHBOARD_Btn") then 
         local btnCont = Engine.SidebarContent["DASHBOARD_Btn"]
@@ -1110,5 +1881,3 @@ task.spawn(function()
         if str then TweenService:Create(str, TweenInfo.new(0.3), {Transparency = 0}):Play() end
     end
 end)
-
-return Engine
