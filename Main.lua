@@ -1094,9 +1094,9 @@ local AutoPage = Engine:AddTab("AUTO FARM", nil, 2)
 local EspPage = Engine:AddTab("ESP", nil, 3)
 
 task.spawn(function()
-    Engine:LoadFeature("Dashboard.lua", "URL_DASHBOARD", DashPage)
-    Engine:LoadFeature("AutoFarm.lua", "URL_AUTO", AutoPage)
-    Engine:LoadFeature("Esp.lua", "URL_ESP", EspPage)
+    Engine:LoadFeature("Dashboard.lua", "https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Dashboard.lua", DashPage)
+    Engine:LoadFeature("AutoFarm.lua", "https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/AutoFarm.lua", AutoPage)
+    Engine:LoadFeature("Esp.lua", "https://raw.githubusercontent.com/XbayyGod/Flawy-Hub/refs/heads/main/Esplua", EspPage)
 
     if Engine.SidebarContent:FindFirstChild("DASHBOARD_Btn") then 
         local btnCont = Engine.SidebarContent["DASHBOARD_Btn"]
